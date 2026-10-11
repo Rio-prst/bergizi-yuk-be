@@ -42,10 +42,17 @@ Backend API for BergiziYuk, a system that traces school symptom reports back to 
    cp .env.example .env
    ```
 
-   Fill in `DATABASE_URL` from Supabase Dashboard: Project Settings →
-   Database → Connection string. Use the **Session Pooler** (port 5432),
-   not the Transaction Pooler, because Prisma needs transactions.
-   `DATABASE_URL_TEST` points to the same database with `?schema=test`.
+   Fill in the connection strings from Supabase Dashboard: Project
+   Settings → Database → Connection string.
+
+   - `DATABASE_URL` uses the **Session Pooler** string (port 5432). Not the
+     Transaction Pooler, because Prisma needs transactions.
+   - `DIRECT_URL` uses the **direct connection** string. Prisma CLI needs it
+     because migrations rely on advisory locks, which do not work through a
+     connection pooler. Note that the direct host (`db.PROJECT_REF.supabase.co`)
+     is often IPv6-only. If migrations fail to connect, switch `DIRECT_URL` to
+     the Session Pooler string as well.
+   - `DATABASE_URL_TEST` uses the Session Pooler string with `?schema=test`.
 
 4. Run Prisma migrations:
 
