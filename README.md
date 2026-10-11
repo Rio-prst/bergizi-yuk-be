@@ -19,11 +19,12 @@ Backend API for BergiziYuk, a system that traces school symptom reports back to 
 
 - Node.js 22+
 - pnpm
-- Docker & Docker Compose
+- Docker & Docker Compose (Redis only)
+- A Supabase project (PostgreSQL hosting)
 
 ### Development
 
-1. Start PostgreSQL and Redis:
+1. Start Redis:
 
    ```bash
    docker compose up -d
@@ -41,6 +42,11 @@ Backend API for BergiziYuk, a system that traces school symptom reports back to 
    cp .env.example .env
    ```
 
+   Fill in `DATABASE_URL` from Supabase Dashboard: Project Settings →
+   Database → Connection string. Use the **Session Pooler** (port 5432),
+   not the Transaction Pooler, because Prisma needs transactions.
+   `DATABASE_URL_TEST` points to the same database with `?schema=test`.
+
 4. Run Prisma migrations:
 
    ```bash
@@ -53,7 +59,7 @@ Backend API for BergiziYuk, a system that traces school symptom reports back to 
    pnpm start:dev
    ```
 
-App is running at `http://localhost:3000`, Swagger docs at `http://localhost:3000/docs`.
+App is running at `http://localhost:3000` (API under `/api`), Swagger docs at `http://localhost:3000/docs`.
 
 ## Available Scripts
 
@@ -62,24 +68,31 @@ App is running at `http://localhost:3000`, Swagger docs at `http://localhost:300
 | `pnpm start:dev` | Start dev server with watch mode |
 | `pnpm build` | Build for production |
 | `pnpm typecheck` | Typecheck without emit |
-| `pnpm test` | Run unit tests (including the linking engine) |
-| `pnpm test:e2e` | Run HTTP end-to-end tests against the `bergiziyuk_test` database |
+| `pnpm test` | Run unit tests (service, controller, linking engine) |
+| `pnpm test:integration` | Run repository integration tests against a real PostgreSQL (needs `DATABASE_URL_TEST`) |
+| `pnpm test:e2e` | Run HTTP end-to-end tests against the test schema |
 | `pnpm lint` | Lint with ESLint |
 | `pnpm format` | Format with Prettier |
 | `pnpm verify` | Full verification gate (typecheck, lint, test) |
 
-`pnpm test:e2e` uses the PostgreSQL service from Docker Compose, so run `docker compose up -d` first.
+`pnpm test:integration` and `pnpm test:e2e` need the test schema in Supabase, so set `DATABASE_URL_TEST` and run `docker compose up -d` for Redis first.
 
 ## Project Structure
 
 ```text
 src/
-  main.ts              # Application bootstrap
+  main.ts              # Application bootstrap (Swagger, global pipe/filter/interceptor)
   app.module.ts        # Root module
-  common/              # Shared infra (guards, decorators, filters, interceptors)
-  infra/               # Infrastructure (Prisma, Redis/queue)
-  auth/                # Authentication and RBAC
-  master-data/         # Regions, kitchens, schools, health units, suppliers
+  common/              # Cross-cutting: errors, filters, interceptors, pipes
+  infra/               # Integrasi eksternal: prisma/, redis/
+  auth/                # Authentication, RBAC, JWT guard, role decorator
+  users/               # Akun, role, org reference
+  regions/             # Hierarki wilayah
+  kitchens/            # Master SPPG/dapur
+  schools/             # Master sekolah
+  health-units/        # Puskesmas/Dinkes
+  suppliers/           # Master pemasok
+  kitchen-school-service/ # Relasi dapur melayani sekolah
   batches/             # Batch management
   deliveries/          # Deliveries, receipt, consumption status
   reports/             # Symptom reports (idempotent)
@@ -88,14 +101,25 @@ src/
   actions/             # Follow-up actions and acknowledgement
   notifications/       # In-app notifications and queue processors
   audit/               # Append-only audit log
+  config/              # Adjustable simulation parameters
   dev-scenario/        # Demo scenario endpoints (dev only)
+  health/              # Health check endpoint
+test/
+  integration/
+  e2e/
 prisma/
   schema.prisma
   migrations/
+docs/
 ```
 
 ## Documentation
 
-- [PRD BergiziYuk](docs/PRD-BergiziYuk.html) (in Indonesian): requirements, business rules, data model, implementation plan
-- [Backend details](docs/README-detail.md) (in Indonesian): environment variables, API overview, linking rules, enums, and test cases
+- [Architecture](docs/architecture.md) (in Indonesian): structure, layers, dependency rules, testing strategy
+- [Business rules](docs/business-rules.md) (in Indonesian): R1-R10, enums, parameters, test cases T1-T12
+- [Domain context](docs/domain-context.md) (in Indonesian): terms, users, product boundaries
+- [Database](docs/database.md) and [ERD](docs/erd.md) (in Indonesian): data model, entities, constraints
+- [API contract](docs/api-contract.md) (in Indonesian): endpoint behavior, per-role access, error format
+- [Tasks](docs/tasks.md): backlog, blockers, dependencies
+- [PRD](docs/prd.md) (in Indonesian): requirements, business rules, implementation plan
 - Swagger: `http://localhost:3000/docs` while the dev server is running
